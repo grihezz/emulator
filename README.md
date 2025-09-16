@@ -103,37 +103,78 @@ python tests/test_processor.py
 ### 1. Поиск максимума в массиве
 
 ```asm
-; Массив: [5, 3, 8, 1, 9, 2, 7]
-; Результат: 9
+; Данные: memory[300] = размер массива, далее элементы без знака
+; Результат (максимум) сохраняется по адресу 100
 
 START:
-    LOAD #0          ; max = 0
-    STORE 100        ; Сохраняем максимум
-    LOAD #0          ; i = 0
-    STORE 101        ; Сохраняем индекс
-    LOAD #7          ; size = 7
-    STORE 102        ; Сохраняем размер
+    LOAD #0
+    STORE 100        ; max = 0
+    STORE 101        ; i = 0
+
+    LOAD #300
+    STORE 102        ; базовый адрес массива
+    LOAD (102)
+    STORE 104        ; размер массива
 
 LOOP:
-    LOAD 101         ; Загружаем i
-    CMP 102          ; Сравниваем с size
-    JZ END           ; Если i == size, конец
-    
-    LOAD 101         ; Загружаем i
-    ADD #200         ; Добавляем адрес массива
-    STORE 103        ; Сохраняем адрес элемента
-    
-    LOAD (103)       ; Загружаем элемент массива
-    CMP 100          ; Сравниваем с максимумом
-    JZ NEXT          ; Если <= максимума, пропускаем
-    
-    STORE 100        ; Сохраняем новый максимум
+    LOAD 101
+    CMP 104
+    JZ END
 
-NEXT:
-    LOAD 101         ; Загружаем i
-    ADD #1           ; Увеличиваем на 1
-    STORE 101        ; Сохраняем обратно
-    JMP LOOP         ; Переходим к началу цикла
+    LOAD 102
+    ADD #1
+    ADD 101
+    STORE 103        ; адрес элемента
+
+    LOAD (103)
+    STORE 108        ; значение элемента
+
+    LOAD 108
+    STORE 105        ; копия элемента
+    LOAD 100
+    STORE 106        ; копия текущего максимума
+
+    LOAD #0
+    STORE 107        ; флаг обновления
+
+COMPARE_LOOP:
+    LOAD 105
+    JZ CHECK_MAX_DONE
+
+    LOAD 106
+    JZ ELEMENT_GREATER
+
+    LOAD 105
+    SUB #1
+    STORE 105
+
+    LOAD 106
+    SUB #1
+    STORE 106
+    JMP COMPARE_LOOP
+
+CHECK_MAX_DONE:
+    LOAD 106
+    JZ COMPARE_END
+    JMP COMPARE_END
+
+ELEMENT_GREATER:
+    LOAD #1
+    STORE 107
+    JMP COMPARE_END
+
+COMPARE_END:
+    LOAD 107
+    JZ SKIP_UPDATE
+
+    LOAD 108
+    STORE 100        ; обновляем максимум
+
+SKIP_UPDATE:
+    LOAD 101
+    ADD #1
+    STORE 101
+    JMP LOOP
 
 END:
     HALT
@@ -142,64 +183,69 @@ END:
 ### 2. Свертка двух массивов
 
 ```asm
-; A = [1, 2, 3, 4, 5, 6]
-; B = [2, 3, 4, 5, 6, 7]
-; Результат: 1*2 + 2*3 + 3*4 + 4*5 + 5*6 + 6*7 = 112
+; Массив A хранится с адреса 300, массив B — с адреса 320
+; Первый элемент каждого массива — количество последующих значений (6)
+; Сумма произведений сохраняется по адресу 100
 
 START:
-    LOAD #0          ; sum = 0
-    STORE 100        ; Сохраняем сумму
-    LOAD #0          ; i = 0
-    STORE 101        ; Сохраняем индекс
-    LOAD #6          ; size = 6
-    STORE 102        ; Сохраняем размер
+    LOAD #0
+    STORE 100        ; sum = 0
+    STORE 101        ; i = 0
+
+    LOAD #300
+    STORE 102        ; база A
+    LOAD #320
+    STORE 103        ; база B
+
+    LOAD (102)
+    STORE 110        ; размер массивов
 
 LOOP:
-    LOAD 101         ; Загружаем i
-    CMP 102          ; Сравниваем с size
-    JZ END           ; Если i == size, конец
-    
-    ; A[i]
-    LOAD 101         ; Загружаем i
-    ADD #200         ; Добавляем адрес A
-    STORE 103        ; Сохраняем адрес A[i]
-    LOAD (103)       ; Загружаем A[i]
-    STORE 104        ; Сохраняем A[i]
-    
-    ; B[i]
-    LOAD 101         ; Загружаем i
-    ADD #210         ; Добавляем адрес B
-    STORE 105        ; Сохраняем адрес B[i]
-    LOAD (105)       ; Загружаем B[i]
-    STORE 106        ; Сохраняем B[i]
-    
-    ; Умножение A[i] * B[i]
-    LOAD #0          ; product = 0
-    STORE 107        ; Сохраняем произведение
-    
-MULT_LOOP:
-    LOAD 106         ; Загружаем B[i]
-    CMP #0           ; Сравниваем с 0
-    JZ MULT_END      ; Если 0, конец умножения
-    
-    LOAD 107         ; Загружаем product
-    ADD 104          ; Добавляем A[i]
-    STORE 107        ; Сохраняем product
-    
-    LOAD 106         ; Загружаем B[i]
-    SUB #1           ; Уменьшаем на 1
-    STORE 106        ; Сохраняем обратно
-    JMP MULT_LOOP    ; Переходим к началу цикла умножения
+    LOAD 101
+    CMP 110
+    JZ END
 
-MULT_END:
-    LOAD 107         ; Загружаем произведение
-    ADD 100          ; Добавляем к сумме
-    STORE 100        ; Сохраняем новую сумму
-    
-    LOAD 101         ; Загружаем i
-    ADD #1           ; Увеличиваем на 1
-    STORE 101        ; Сохраняем обратно
-    JMP LOOP         ; Переходим к началу цикла
+    LOAD 102
+    ADD #1
+    ADD 101
+    STORE 104
+    LOAD (104)
+    STORE 106        ; A[i]
+
+    LOAD 103
+    ADD #1
+    ADD 101
+    STORE 105
+    LOAD (105)
+    STORE 107        ; B[i]
+
+    LOAD 107
+    STORE 109        ; счётчик умножения
+    LOAD #0
+    STORE 108        ; произведение
+
+MULT_LOOP:
+    LOAD 109
+    JZ MULT_DONE
+
+    LOAD 108
+    ADD 106
+    STORE 108
+
+    LOAD 109
+    SUB #1
+    STORE 109
+    JMP MULT_LOOP
+
+MULT_DONE:
+    LOAD 100
+    ADD 108
+    STORE 100
+
+    LOAD 101
+    ADD #1
+    STORE 101
+    JMP LOOP
 
 END:
     HALT

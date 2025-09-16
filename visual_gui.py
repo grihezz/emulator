@@ -361,55 +361,75 @@ class VisualProcessorGUI:
         
     def load_default_example(self):
         """Загрузка примера по умолчанию"""
-        example_code = """; Простая программа свертки двух массивов
-; A = [2, 3] и B = [4, 5]
-; Результат: 2*4 + 3*5 = 8 + 15 = 23
+        example_code = """; Вариант 9: Свертка двух массивов (6 элементов, целые без знака)
+; Массив A начинается по адресу 300, массив B — по адресу 320.
+; Формат хранения: [размер, элемент0, элемент1, ...]
+; Результат сохраняется в ячейке 100.
 
-; Инициализация суммы
-LOAD #0
-STORE 100
+START:
+    LOAD #0
+    STORE 100        ; сумма свертки
+    STORE 101        ; индекс i
 
-; Первое произведение: A[0] * B[0] = 2 * 4 = 8
-LOAD 201
-STORE 101
-LOAD 211
-STORE 102
+    LOAD #300
+    STORE 102        ; база массива A
+    LOAD #320
+    STORE 103        ; база массива B
 
-; Умножение 2 * 4 = 8 (4 раза добавляем 2)
-LOAD #0
-ADD 101
-ADD 101
-ADD 101
-ADD 101
-STORE 103
+    LOAD (102)
+    STORE 110        ; размер массивов
 
-; Добавляем к сумме
-LOAD 100
-ADD 103
-STORE 100
+LOOP:
+    LOAD 101
+    CMP 110
+    JZ END
 
-; Второе произведение: A[1] * B[1] = 3 * 5 = 15
-LOAD 202
-STORE 101
-LOAD 212
-STORE 102
+    LOAD 102
+    ADD #1
+    ADD 101
+    STORE 104
+    LOAD (104)
+    STORE 106        ; A[i]
 
-; Умножение 3 * 5 = 15 (5 раз добавляем 3)
-LOAD #0
-ADD 101
-ADD 101
-ADD 101
-ADD 101
-ADD 101
-STORE 103
+    LOAD 103
+    ADD #1
+    ADD 101
+    STORE 105
+    LOAD (105)
+    STORE 107        ; B[i]
 
-; Добавляем к сумме
-LOAD 100
-ADD 103
-STORE 100
+    LOAD 107
+    STORE 109        ; счётчик для умножения
+    LOAD #0
+    STORE 108        ; произведение
 
-HALT
+MULT_LOOP:
+    LOAD 109
+    JZ MULT_DONE
+
+    LOAD 108
+    ADD 106
+    STORE 108
+
+    LOAD 109
+    SUB #1
+    STORE 109
+    JMP MULT_LOOP
+
+MULT_DONE:
+    LOAD 100
+    ADD 108
+    STORE 100
+
+    LOAD 101
+    ADD #1
+    STORE 101
+    JMP LOOP
+
+END:
+    HALT
 """
+        self.code_text.delete(1.0, tk.END)
         self.code_text.insert(tk.END, example_code)
         
     def step_with_animation(self):
@@ -590,23 +610,33 @@ HALT
                 
                 # Загружаем тестовые данные в зависимости от программы
                 source_code = self.code_text.get(1.0, tk.END)
-                if "свертки" in source_code or "convolution" in source_code.lower():
-                    # Данные для свертки
-                    array_a = [2, 3]  # Массив A
-                    array_b = [4, 5]  # Массив B
-                    self.processor.load_data(array_a, 201)
-                    self.processor.load_data(array_b, 211)
-                    data_info = f"Данные для свертки: A={array_a}, B={array_b}"
-                elif "максимума" in source_code or "max" in source_code.lower():
-                    # Данные для поиска максимума
-                    test_data = [5, 3, 8, 1, 9, 2, 7]
-                    self.processor.load_data(test_data, 201)
-                    data_info = f"Данные для поиска максимума: {test_data}"
+                if "сверт" in source_code.lower() or "convolution" in source_code.lower():
+                    # Данные для свертки с указанием длины массивов
+                    array_a = [6, 1, 2, 3, 4, 5, 6]
+                    array_b = [6, 6, 5, 4, 3, 2, 1]
+                    self.processor.load_data(array_a, 300)
+                    self.processor.load_data(array_b, 320)
+                    data_info = (
+                        "Данные для свертки: "
+                        f"A={array_a} (адреса 300-306), "
+                        f"B={array_b} (адреса 320-326)"
+                    )
+                elif "максимум" in source_code.lower() or "max" in source_code.lower():
+                    # Данные для поиска максимума (первый элемент — размер)
+                    test_data = [6, 12, 3, 27, 9, 1, 18]
+                    self.processor.load_data(test_data, 300)
+                    data_info = (
+                        "Данные для поиска максимума: "
+                        f"{test_data} (адреса 300-306)"
+                    )
                 else:
                     # Данные по умолчанию
-                    test_data = [1, 2, 3, 4, 5]
-                    self.processor.load_data(test_data, 201)
-                    data_info = f"Данные по умолчанию: {test_data}"
+                    default_data = [4, 10, 20, 30, 40]
+                    self.processor.load_data(default_data, 300)
+                    data_info = (
+                        "Данные по умолчанию (формат [N, ...]): "
+                        f"{default_data} (адреса 300-304)"
+                    )
                 
                 self.update_display()
                 messagebox.showinfo("Успех", f"Программа загружена! {len(machine_codes)} инструкций.\n{data_info}")
