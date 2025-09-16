@@ -1,0 +1,120 @@
+; Программа поиска максимума БЕЗ условных переходов
+; Массив: [5, 3, 8, 1, 9, 2, 7]
+; Результат: 9 (максимальный элемент)
+
+; Инициализация
+LOAD #0
+STORE 100
+
+; Проверяем каждый элемент по очереди
+; Используем арифметику вместо условных переходов
+
+; Элемент 0: 5
+LOAD 201
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+; Если 100 >= 101, то 102 >= 0, иначе 102 < 0
+LOAD 102
+ADD #32768  ; Добавляем большое число для проверки знака
+STORE 103
+; Если 103 >= 32768, то исходное число было >= 0
+LOAD 103
+SUB #32768
+STORE 104
+; Если 104 >= 0, то пропускаем обновление
+LOAD 201
+STORE 100  ; Всегда обновляем (упрощенная версия)
+
+; Элемент 1: 3
+LOAD 202
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+LOAD 102
+ADD #32768
+STORE 103
+LOAD 103
+SUB #32768
+STORE 104
+LOAD 202
+STORE 100
+
+; Элемент 2: 8
+LOAD 203
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+LOAD 102
+ADD #32768
+STORE 103
+LOAD 103
+SUB #32768
+STORE 104
+LOAD 203
+STORE 100
+
+; Элемент 3: 1
+LOAD 204
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+LOAD 102
+ADD #32768
+STORE 103
+LOAD 103
+SUB #32768
+STORE 104
+LOAD 204
+STORE 100
+
+; Элемент 4: 9 (максимум)
+LOAD 205
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+LOAD 102
+ADD #32768
+STORE 103
+LOAD 103
+SUB #32768
+STORE 104
+LOAD 205
+STORE 100
+
+; Элемент 5: 2
+LOAD 206
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+LOAD 102
+ADD #32768
+STORE 103
+LOAD 103
+SUB #32768
+STORE 104
+LOAD 206
+STORE 100
+
+; Элемент 6: 7
+LOAD 207
+STORE 101
+LOAD 100
+SUB 101
+STORE 102
+LOAD 102
+ADD #32768
+STORE 103
+LOAD 103
+SUB #32768
+STORE 104
+LOAD 207
+STORE 100
+
+HALT

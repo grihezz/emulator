@@ -1,0 +1,2 @@
+LOAD #42
+HALT
