@@ -45,8 +45,17 @@ class Assembler:
             else:
                 raise ValueError(f"Неизвестная метка: {addr_str}")
 
-        if operand_str == 'R0':
-            return 0, 'register'
+        # Регистровая адресация (R0-R15)
+        if operand_str.startswith('R') and len(operand_str) >= 2:
+            reg_str = operand_str[1:]
+            if reg_str.isdigit():
+                reg_num = int(reg_str)
+                if 0 <= reg_num <= 15:
+                    return reg_num, 'register'
+                else:
+                    raise ValueError(f"Недопустимый номер регистра: {operand_str}")
+            else:
+                raise ValueError(f"Недопустимый формат регистра: {operand_str}")
 
         if operand_str.isdigit():
             return int(operand_str), 'direct'
@@ -61,14 +70,15 @@ class Assembler:
                 raise ValueError(f"Неизвестный операнд: {operand_str}")
     
     def encode_instruction(self, opcode, operand, operand_type):
-        """Кодирование команды в машинный код"""
-        # Кодируем тип адресации в операнде
         if operand_type == 'immediate':
             # Непосредственная адресация: добавляем 512
             encoded_operand = (operand + 512) & 0xFFF
         elif operand_type == 'indirect':
             # Косвенная адресация: добавляем 256
             encoded_operand = (operand + 256) & 0xFFF
+        elif operand_type == 'register':
+            # Регистровая адресация: добавляем 1024
+            encoded_operand = (operand + 1024) & 0xFFF
         else:
             # Прямая адресация: операнд как есть
             encoded_operand = operand & 0xFFF
@@ -78,46 +88,35 @@ class Assembler:
         return instruction
     
     def parse_line(self, line):
-        """Парсинг одной строки ассемблера"""
         line = line.strip()
-        
-        # Пропускаем пустые строки и комментарии
         if not line or line.startswith(';'):
             return None
-        
-        # Удаляем комментарии
+
         if ';' in line:
             line = line[:line.index(';')].strip()
-        
-        # Проверяем на метку
+
         label = None
         if ':' in line:
             parts = line.split(':', 1)
             label = parts[0].strip()
             line = parts[1].strip()
-            
-            # Сохраняем метку
             self.labels[label] = self.address_counter
-        
-        # Пропускаем строки только с метками
+
         if not line:
             return None
-        
-        # Разбор команды
+
         parts = line.split()
         if not parts:
             return None
         
         mnemonic = parts[0].upper()
         operand_str = parts[1] if len(parts) > 1 else None
-        
-        # Проверяем код операции
+
         if mnemonic not in self.opcodes:
             raise ValueError(f"Неизвестная команда: {mnemonic}")
         
         opcode = self.opcodes[mnemonic]
-        
-        # Обработка команд без операндов
+
         if mnemonic == 'HALT':
             operand = 0
             operand_type = 'none'
@@ -126,11 +125,8 @@ class Assembler:
                 raise ValueError(f"Команда {mnemonic} требует операнд")
             
             operand, operand_type = self.parse_operand(operand_str)
-        
-        # Кодирование команды
+
         instruction = self.encode_instruction(opcode, operand, operand_type)
-        
-        # Увеличиваем счетчик адресов
         self.address_counter += 1
         
         return {
@@ -143,18 +139,15 @@ class Assembler:
         }
     
     def assemble(self, source_code):
-        """Ассемблирование исходного кода"""
         self.reset()
         
         lines = source_code.split('\n')
         instructions = []
         errors = []
-        
-        # Первый проход: сбор меток
+
         self.address_counter = 0
         for line_num, line in enumerate(lines, 1):
             try:
-                # Простой парсинг только для сбора меток
                 line = line.strip()
                 if not line or line.startswith(';'):
                     continue
@@ -168,17 +161,14 @@ class Assembler:
                     self.labels[label] = self.address_counter
                     line = parts[1].strip()
                     
-                if line:  # Если есть команда после метки
+                if line:
                     self.address_counter += 1
                     
             except Exception as e:
-                # Игнорируем ошибки в первом проходе
                 pass
-        
-        # Сброс счетчика для второго прохода
+
         self.address_counter = 0
-        
-        # Второй проход: генерация кода
+
         for line_num, line in enumerate(lines, 1):
             try:
                 result = self.parse_line(line)
@@ -191,35 +181,9 @@ class Assembler:
             raise ValueError("Ошибки ассемблирования:\n" + "\n".join(errors))
         
         return instructions
-    
-    def disassemble(self, instruction):
-        """Диссемблирование машинной команды"""
-        opcode = (instruction >> 12) & 0xF
-        operand = instruction & 0xFFF
-        
-        # Поиск мнемоники
-        mnemonic = None
-        for name, code in self.opcodes.items():
-            if code == opcode:
-                mnemonic = name
-                break
-        
-        if mnemonic is None:
-            return f"UNKNOWN {opcode:04X} {operand:03X}"
-        
-        if mnemonic == 'HALT':
-            return mnemonic
-        
-        # Определение типа операнда
-        if operand == 0:
-            return f"{mnemonic} R0"
-        elif operand < 256:  # Предполагаем, что это прямой адрес
-            return f"{mnemonic} {operand}"
-        else:
-            return f"{mnemonic} #{operand}"
+
     
     def format_program(self, instructions):
-        """Форматирование программы для вывода"""
         result = []
         for instr in instructions:
             addr = instr['address']
@@ -228,20 +192,18 @@ class Assembler:
             operand = instr['operand']
             operand_type = instr['operand_type']
             label = instr['label']
-            
-            # Форматирование операнда
+
             if operand_type == 'immediate':
                 operand_str = f"#{operand}"
             elif operand_type == 'indirect':
                 operand_str = f"({operand})"
             elif operand_type == 'register':
-                operand_str = "R0"
+                operand_str = f"R{operand}"
             elif operand_type == 'direct':
                 operand_str = str(operand)
             else:
                 operand_str = ""
-            
-            # Формирование строки
+
             line = f"{addr:04X}: {code:04X} "
             if label:
                 line += f"{label:10s} "

@@ -84,6 +84,25 @@ class DataFlowVisualizer:
             'x': 570, 'y': 100
         }
         
+        # Регистры общего назначения R0-R15
+        register_gp_y = 200  # Y-позиция для общей группы регистров
+        register_gp_x_start = 600  # Начало X-позиции
+        
+        for i in range(16):
+            x_start = register_gp_x_start + (i % 4) * 60  # 4 регистра в ряду
+            y_start = register_gp_y + (i // 4) * 60  # 4 ряда
+            x_end = x_start + 50
+            y_end = y_start + 45
+            
+            reg_name = f'R{i}'
+            self.components[reg_name] = {
+                'rect': self.canvas.create_rectangle(x_start, y_start, x_end, y_end, 
+                                                     fill=colors['register'], outline='black', width=2),
+                'text': self.canvas.create_text(x_start + 25, y_start + 22, 
+                                                text=f'R{i}\n0', font=('Arial', 9, 'bold')),
+                'x': x_start + 25, 'y': y_start + 22
+            }
+        
         # Соединительные линии
         self.create_connections()
         
@@ -107,6 +126,15 @@ class DataFlowVisualizer:
         # ALU -> FLAGS
         self.canvas.create_line(300, 185, 520, 100, width=2, fill='gray', dash=(5, 5))
         
+        # Регистры общего назначения -> ALU (пунктирные линии для показа возможности)
+        for i in range(16):
+            reg_name = f'R{i}'
+            if reg_name in self.components:
+                reg_comp = self.components[reg_name]
+                # Тонкая линия от регистра к АЛУ
+                self.canvas.create_line(reg_comp['x'], reg_comp['y'] - 22, 175, 150, 
+                                       width=1, fill='lightgray', dash=(3, 3))
+        
     def update_component(self, component, value):
         """Обновление значения компонента"""
         if component in self.components:
@@ -119,6 +147,8 @@ class DataFlowVisualizer:
                 self.canvas.itemconfig(comp['text'], text=f'IR\n{value:04X}')
             elif component == 'FLAGS':
                 self.canvas.itemconfig(comp['text'], text=f'Флаги\n{value}')
+            elif component.startswith('R'):  # R0-R15
+                self.canvas.itemconfig(comp['text'], text=f'{component}\n{value}')
                 
     def animate_data_flow(self, from_comp, to_comp, data_value, color='red'):
         if from_comp not in self.components or to_comp not in self.components:
@@ -160,7 +190,7 @@ class VisualProcessorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Эмулятор процессора с визуализацией - Вариант №9")
-        self.root.geometry("1400x900")
+        self.root.geometry("1600x900")
         self.processor = Processor()
         self.assembler = Assembler()
         self.running = False
@@ -184,7 +214,7 @@ class VisualProcessorGUI:
         canvas_frame = ttk.Frame(left_frame)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.canvas = Canvas(canvas_frame, bg='white', width=800, height=500)
+        self.canvas = Canvas(canvas_frame, bg='white', width=1000, height=600)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         v_scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
@@ -249,6 +279,7 @@ class VisualProcessorGUI:
         self.pc_var = tk.StringVar()
         self.ir_var = tk.StringVar()
         
+        # Системные регистры
         ttk.Label(state_frame, text="Аккумулятор:").grid(row=0, column=0, sticky=tk.W)
         ttk.Label(state_frame, textvariable=self.acc_var, font=('Courier', 10)).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         
@@ -257,6 +288,19 @@ class VisualProcessorGUI:
         
         ttk.Label(state_frame, text="Регистр команд:").grid(row=2, column=0, sticky=tk.W)
         ttk.Label(state_frame, textvariable=self.ir_var, font=('Courier', 10)).grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
+        
+        # Регистры общего назначения
+        reg_frame = ttk.LabelFrame(parent, text="Регистры общего назначения (R0-R15)", padding=10)
+        reg_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.reg_vars = {}
+        for i in range(16):
+            var = tk.StringVar()
+            self.reg_vars[f'R{i}'] = var
+            row = i // 4
+            col = (i % 4) * 2
+            ttk.Label(reg_frame, text=f"R{i}:").grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+            ttk.Label(reg_frame, textvariable=var, font=('Courier', 9)).grid(row=row, column=col+1, sticky=tk.W, padx=(0, 10))
 
         flags_frame = ttk.LabelFrame(parent, text="Флаги", padding=10)
         flags_frame.pack(fill=tk.X, pady=(0, 10))
@@ -463,12 +507,9 @@ END:
         # speed=1.0 → нормальная скорость
         # speed=3.0 → 3x быстрее
         if self.animation_enabled_var.get():
-            # Меньше шагов и меньше задержка = быстрее
-            # base_steps = 10, но делаем динамически
             self.visualizer.animation_steps = max(3, int(15 / speed))
             self.visualizer.animation_delay = max(5, int(50 / speed))
         else:
-            # Анимация отключена
             self.visualizer.animation_steps = 1
             self.visualizer.animation_delay = 1
         
@@ -476,15 +517,14 @@ END:
         ir = new_state['IR']
         opcode = (ir >> 12) & 0xF
         operand = ir & 0xFFF
-        
-        # Применяем текущую скорость ко всем задержкам
+
         speed = self.speed_var.get()
-        delay_1 = max(10, int(100 / speed))  # Было 100
-        delay_2 = max(20, int(200 / speed))  # Было 200
-        delay_3 = max(40, int(400 / speed))  # Было 400
-        delay_4 = max(60, int(600 / speed))  # Было 600
-        delay_5 = max(80, int(800 / speed))  # Было 800
-        delay_short = max(5, int(50 / speed))  # Было 50
+        delay_1 = max(10, int(100 / speed))
+        delay_2 = max(20, int(200 / speed))
+        delay_3 = max(40, int(400 / speed))
+        delay_4 = max(60, int(600 / speed))
+        delay_5 = max(80, int(800 / speed))
+        delay_short = max(5, int(50 / speed))
 
         self.visualizer.highlight_component('PC', 'lightblue', delay_5)
         self.visualizer.highlight_component('IR', 'lightgreen', delay_4)
@@ -561,11 +601,13 @@ END:
         self.clear_logs()
         self.update_display()
         
-        # Сброс визуализации
+        # Сброс визуализации (включая регистры)
         self.visualizer.update_component('ACC', 0)
         self.visualizer.update_component('PC', 0)
         self.visualizer.update_component('IR', 0)
         self.visualizer.update_component('FLAGS', '----')
+        for i in range(16):
+            self.visualizer.update_component(f'R{i}', 0)
         
     def full_reset_processor(self):
         """Полный сброс процессора (очищает память)"""
@@ -580,11 +622,13 @@ END:
         self.clear_logs()
         self.update_display()
         
-        # Сброс визуализации
+        # Сброс визуализации (включая регистры)
         self.visualizer.update_component('ACC', 0)
         self.visualizer.update_component('PC', 0)
         self.visualizer.update_component('IR', 0)
         self.visualizer.update_component('FLAGS', '----')
+        for i in range(16):
+            self.visualizer.update_component(f'R{i}', 0)
         
     def assemble_code(self):
         """Ассемблирование кода"""
@@ -670,6 +714,14 @@ END:
         self.pc_var.set(f"{self.processor.PC} (0x{self.processor.PC:04X})")
         self.ir_var.set(f"{self.processor.IR} (0x{self.processor.IR:04X})")
         
+        # Обновляем регистры общего назначения
+        for i, reg_var in enumerate(self.reg_vars.values()):
+            if hasattr(self.processor, 'registers'):
+                reg_val = self.processor.registers[i] if i < len(self.processor.registers) else 0
+                reg_var.set(f"{reg_val} (0x{reg_val:04X})")
+            else:
+                reg_var.set("0 (0x0000)")
+        
         # Обновляем флаги
         for flag, var in self.flag_vars.items():
             var.set(self.processor.flags[flag])
@@ -690,6 +742,13 @@ END:
         self.visualizer.update_component('IR', self.processor.IR)
         flags_str = f"{'Z' if self.processor.flags['ZF'] else '-'}{'S' if self.processor.flags['SF'] else '-'}{'C' if self.processor.flags['CF'] else '-'}{'O' if self.processor.flags['OF'] else '-'}"
         self.visualizer.update_component('FLAGS', flags_str)
+        
+        # Обновляем регистры общего назначения в визуализации
+        if hasattr(self.processor, 'registers'):
+            for i in range(16):
+                reg_name = f'R{i}'
+                reg_val = self.processor.registers[i] if i < len(self.processor.registers) else 0
+                self.visualizer.update_component(reg_name, reg_val)
         
         # Обновляем память
         self.update_memory_display()

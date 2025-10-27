@@ -1,0 +1,75 @@
+START:
+    LOAD #0
+    STORE R1
+    STORE R2
+    
+    LOAD #300
+    STORE 102
+    LOAD (102)
+    STORE R4
+    STORE 110
+
+LOOP:
+    LOAD R2
+    CMP R4
+    JZ END
+    
+    LOAD 102
+    ADD #1
+    ADD R2
+    STORE 103
+    
+    LOAD (103)
+    STORE R6
+    
+    LOAD R6
+    STORE R7
+    LOAD R1
+    STORE R8
+    LOAD #0
+    STORE R9
+
+COMPARE_LOOP:
+    LOAD R7
+    JZ CHECK_MAX_DONE
+    
+    LOAD R8
+    JZ ELEMENT_GREATER
+    
+    LOAD R7
+    SUB #1
+    STORE R7
+    
+    LOAD R8
+    SUB #1
+    STORE R8
+    
+    JMP COMPARE_LOOP
+
+CHECK_MAX_DONE:
+    LOAD R8
+    JZ COMPARE_END
+    JMP COMPARE_END
+
+ELEMENT_GREATER:
+    LOAD #1
+    STORE R9
+    JMP COMPARE_END
+
+COMPARE_END:
+    LOAD R9
+    JZ SKIP_UPDATE
+    
+    LOAD R6
+    STORE R1
+    
+SKIP_UPDATE:
+    LOAD R2
+    ADD #1
+    STORE R2
+    JMP LOOP
+
+END:
+    LOAD R1
+    STORE 100
+    HALT

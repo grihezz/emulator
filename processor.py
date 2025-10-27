@@ -8,6 +8,7 @@ class Processor:
         self.ACC = 0          # Аккумулятор (16 бит)
         self.PC = 0           # Счетчик команд (16 бит)
         self.IR = 0           # Регистр команд (16 бит)
+        self.registers = [0] * 16  # Регистры общего назначения R0-R15
         self.flags = {
             'ZF': False,      # Флаг нуля
             'SF': False,      # Флаг знака
@@ -38,6 +39,7 @@ class Processor:
         self.ACC = 0
         self.PC = 0
         self.IR = 0
+        self.registers = [0] * 16
         self.flags = {'ZF': False, 'SF': False, 'CF': False, 'OF': False}
         self.halted = False
         self.step_count = 0
@@ -64,8 +66,7 @@ class Processor:
                 return self.memory[addr] if addr < len(self.memory) else 0
             else:
                 return operand
-        
-        # Для ассемблера (строки)
+
         # Непосредственная адресация (#value)
         if operand.startswith('#'):
             return int(operand[1:])
@@ -73,15 +74,15 @@ class Processor:
         # Прямая адресация (address)
         if operand.isdigit():
             return self.memory[int(operand)]
+
         
-        # Косвенно-регистровая адресация ((address))
-        if operand.startswith('(') and operand.endswith(')'):
-            addr = int(operand[1:-1])
-            return self.memory[self.memory[addr]]
-        
-        # Регистровая адресация (R0 - аккумулятор)
-        if operand == 'R0':
-            return self.ACC
+        # Регистровая адресация (R0-R7)
+        if operand.startswith('R') and len(operand) >= 2:
+            # Поддержка R0-R15
+            reg_str = operand[1:]
+            reg_num = int(reg_str) if reg_str.isdigit() else -1
+            if 0 <= reg_num <= 15:
+                return self.registers[reg_num] & 0xFFFF
         
         return 0
     
@@ -94,80 +95,91 @@ class Processor:
             self.memory[int(operand)] = value & 0xFFFF
             return
 
-        if operand.startswith('(') and operand.endswith(')'):
-            addr = int(operand[1:-1])
-            self.memory[self.memory[addr]] = value & 0xFFFF
-            return
-
-        if operand == 'R0':
-            self.ACC = value & 0xFFFF
+        # Регистровая адресация (R0-R7)
+        if operand.startswith('R') and len(operand) >= 2:
+            # Поддержка R0-R15
+            reg_str = operand[1:]
+            reg_num = int(reg_str) if reg_str.isdigit() else -1
+            if 0 <= reg_num <= 15:
+                self.registers[reg_num] = value & 0xFFFF
     
     def update_flags(self, result):
-        """Обновление флагов после операции"""
-        # Флаг нуля
         self.flags['ZF'] = (result == 0)
-        
-        # Флаг знака (старший бит)
         self.flags['SF'] = (result & 0x8000) != 0
-        
-        # Флаг переноса (выход за 16 бит)
         self.flags['CF'] = (result > 0xFFFF) or (result < -0x10000)
-        
-        # Флаг переполнения (знаковое переполнение)
         self.flags['OF'] = (result > 0x7FFF) or (result < -0x8000)
     
     def execute_instruction(self, opcode, operand):
-        """Выполнение одной команды"""
         if opcode == self.opcodes['LOAD']:
-            # Определяем тип адресации по диапазону операнда
             if operand < 256:  # 0-255: прямая адресация
                 value = self.get_operand_value(operand, 'direct')
             elif operand < 512:  # 256-511: косвенная адресация
                 addr = operand - 256
                 value = self.get_operand_value(addr, 'indirect')
-            else:  # 512+: непосредственная адресация
+            elif operand < 1024:  # 512-1023: непосредственная адресация
                 value = self.get_operand_value(operand - 512, 'immediate')
+            elif operand >= 1024 and operand < 1040:  # 1024-1039: регистровая адресация (R0-R15)
+                reg_num = operand - 1024
+                value = self.registers[reg_num] & 0xFFFF
+            else:
+                value = 0
             self.ACC = value & 0xFFFF
             self.update_flags(self.ACC)
             
         elif opcode == self.opcodes['STORE']:
-            self.memory[operand] = self.ACC & 0xFFFF
+            if operand >= 1024 and operand < 1040:
+                reg_num = operand - 1024
+                self.registers[reg_num] = self.ACC & 0xFFFF
+            else:
+                self.memory[operand] = self.ACC & 0xFFFF
             
         elif opcode == self.opcodes['ADD']:
-            # Определяем тип адресации по диапазону операнда
             if operand < 256:  # 0-255: прямая адресация
                 value = self.get_operand_value(operand, 'direct')
             elif operand < 512:  # 256-511: косвенная адресация
                 addr = operand - 256
                 value = self.get_operand_value(addr, 'indirect')
-            else:  # 512+: непосредственная адресация
+            elif operand < 1024:  # 512-1023: непосредственная адресация
                 value = self.get_operand_value(operand - 512, 'immediate')
+            elif operand >= 1024 and operand < 1040:  # 1024-1039: регистровая адресация (R0-R15)
+                reg_num = operand - 1024
+                value = self.registers[reg_num] & 0xFFFF
+            else:
+                value = 0
             result = self.ACC + value
             self.ACC = result & 0xFFFF
             self.update_flags(self.ACC)
             
         elif opcode == self.opcodes['SUB']:
-            # Определяем тип адресации по диапазону операнда
             if operand < 256:  # 0-255: прямая адресация
                 value = self.get_operand_value(operand, 'direct')
             elif operand < 512:  # 256-511: косвенная адресация
                 addr = operand - 256
                 value = self.get_operand_value(addr, 'indirect')
-            else:  # 512+: непосредственная адресация
+            elif operand < 1024:  # 512-1023: непосредственная адресация
                 value = self.get_operand_value(operand - 512, 'immediate')
+            elif operand >= 1024 and operand < 1040:  # 1024-1039: регистровая адресация (R0-R15)
+                reg_num = operand - 1024
+                value = self.registers[reg_num] & 0xFFFF
+            else:
+                value = 0
             result = self.ACC - value
             self.ACC = result & 0xFFFF
             self.update_flags(self.ACC)
             
         elif opcode == self.opcodes['CMP']:
-            # Определяем тип адресации по диапазону операнда
             if operand < 256:  # 0-255: прямая адресация
                 value = self.get_operand_value(operand, 'direct')
             elif operand < 512:  # 256-511: косвенная адресация
                 addr = operand - 256
                 value = self.get_operand_value(addr, 'indirect')
-            else:  # 512+: непосредственная адресация
+            elif operand < 1024:  # 512-1023: непосредственная адресация
                 value = self.get_operand_value(operand - 512, 'immediate')
+            elif operand >= 1024 and operand < 1040:  # 1024-1039: регистровая адресация (R0-R15)
+                reg_num = operand - 1024
+                value = self.registers[reg_num] & 0xFFFF
+            else:
+                value = 0
             result = self.ACC - value
             self.update_flags(result)
             
@@ -223,6 +235,7 @@ class Processor:
             'ACC': self.ACC,
             'PC': self.PC,
             'IR': self.IR,
+            'registers': self.registers.copy(),
             'flags': self.flags.copy(),
             'halted': self.halted,
             'step_count': self.step_count
@@ -237,14 +250,18 @@ class Processor:
             if op_name == 'HALT':
                 return f"{op_name}"
             else:
-                return f"{op_name} {operand}"
+                # Определяем тип адресации и форматируем операнд
+                if operand >= 1024 and operand < 1040:
+                    reg_num = operand - 1024
+                    return f"{op_name} R{reg_num}"
+                elif operand >= 512 and operand < 1024:
+                    value = operand - 512
+                    return f"{op_name} #{value}"
+                elif operand >= 256 and operand < 512:
+                    addr = operand - 256
+                    return f"{op_name} ({addr})"
+                else:
+                    return f"{op_name} {operand}"
         else:
             return f"UNKNOWN {opcode:04X} {operand:03X}"
-    
-    def get_memory_dump(self, start=0, count=100):
-        result = []
-        for i in range(start, min(start + count, len(self.memory))):
-            if self.memory[i] != 0:
-                disasm = self.disassemble_instruction(self.memory[i])
-                result.append(f"{i:04X}: {self.memory[i]:04X} ({disasm})")
-        return result
+
