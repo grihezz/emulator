@@ -5,7 +5,6 @@
 
 class Processor:
     def __init__(self):
-        # Регистры процессора
         self.ACC = 0          # Аккумулятор (16 бит)
         self.PC = 0           # Счетчик команд (16 бит)
         self.IR = 0           # Регистр команд (16 бит)
@@ -15,11 +14,8 @@ class Processor:
             'CF': False,      # Флаг переноса
             'OF': False       # Флаг переполнения
         }
-        
-        # Память (4096 ячеек по 16 бит)
+
         self.memory = [0] * 4096
-        
-        # Состояние процессора
         self.halted = False
         self.step_count = 0
         
@@ -35,35 +31,29 @@ class Processor:
             'JNZ': 0x8,       # 1000
             'HALT': 0x0       # 0000
         }
-        
-        # Обратное соответствие кодов операций
+
         self.opcode_names = {v: k for k, v in self.opcodes.items()}
     
     def reset(self):
-        """Сброс процессора в начальное состояние"""
         self.ACC = 0
         self.PC = 0
         self.IR = 0
         self.flags = {'ZF': False, 'SF': False, 'CF': False, 'OF': False}
         self.halted = False
         self.step_count = 0
-        # НЕ очищаем память - программа должна остаться!
     
     def load_program(self, program, start_address=0):
-        """Загрузка программы в память"""
         for i, instruction in enumerate(program):
             if start_address + i < len(self.memory):
                 self.memory[start_address + i] = instruction
         self.PC = start_address
     
     def load_data(self, data, start_address=200):
-        """Загрузка данных в память"""
         for i, value in enumerate(data):
             if start_address + i < len(self.memory):
                 self.memory[start_address + i] = value
     
     def get_operand_value(self, operand, addressing_mode='direct'):
-        """Получение значения операнда в зависимости от типа адресации"""
         if isinstance(operand, int):
             if addressing_mode == 'immediate':
                 return operand
@@ -96,23 +86,19 @@ class Processor:
         return 0
     
     def set_operand_value(self, operand, value):
-        """Установка значения операнда в зависимости от типа адресации"""
         if isinstance(operand, int):
             self.memory[operand] = value & 0xFFFF
             return
-        
-        # Прямая адресация (address)
+
         if operand.isdigit():
             self.memory[int(operand)] = value & 0xFFFF
             return
-        
-        # Косвенно-регистровая адресация ((address))
+
         if operand.startswith('(') and operand.endswith(')'):
             addr = int(operand[1:-1])
             self.memory[self.memory[addr]] = value & 0xFFFF
             return
-        
-        # Регистровая адресация (R0 - аккумулятор)
+
         if operand == 'R0':
             self.ACC = value & 0xFFFF
     
@@ -192,39 +178,32 @@ class Processor:
             if self.flags['ZF']:
                 self.PC = operand
             else:
-                self.PC += 1  # Увеличиваем PC, если переход НЕ выполняется
+                self.PC += 1
                 
         elif opcode == self.opcodes['JNZ']:
             if not self.flags['ZF']:
                 self.PC = operand
             else:
-                self.PC += 1  # Увеличиваем PC, если переход НЕ выполняется
+                self.PC += 1
                 
         elif opcode == self.opcodes['HALT']:
             self.halted = True
-            return  # Не увеличиваем PC
+            return
     
     def step(self):
-        """Выполнение одного шага программы"""
         if self.halted:
             return False
-        
-        # Загрузка команды
+
         if self.PC >= len(self.memory):
             self.halted = True
             return False
         
         self.IR = self.memory[self.PC]
-        
-        # Декодирование команды
+
         opcode = (self.IR >> 12) & 0xF
         operand = self.IR & 0xFFF
-        
-        # Выполнение команды
+
         self.execute_instruction(opcode, operand)
-        
-        # Переход к следующей команде (если не было перехода)
-        # Команды переходов сами управляют PC через return
         if opcode not in [self.opcodes['JMP'], self.opcodes['JZ'], self.opcodes['JNZ'], self.opcodes['HALT']]:
             self.PC += 1
         
@@ -232,7 +211,6 @@ class Processor:
         return True
     
     def run(self, max_steps=10000):
-        """Выполнение программы до завершения или максимального количества шагов"""
         steps = 0
         while not self.halted and steps < max_steps:
             if not self.step():
@@ -241,7 +219,6 @@ class Processor:
         return not self.halted
     
     def get_state(self):
-        """Получение текущего состояния процессора"""
         return {
             'ACC': self.ACC,
             'PC': self.PC,
@@ -252,7 +229,6 @@ class Processor:
         }
     
     def disassemble_instruction(self, instruction):
-        """Диссемблирование команды"""
         opcode = (instruction >> 12) & 0xF
         operand = instruction & 0xFFF
         
@@ -266,10 +242,9 @@ class Processor:
             return f"UNKNOWN {opcode:04X} {operand:03X}"
     
     def get_memory_dump(self, start=0, count=100):
-        """Получение дампа памяти"""
         result = []
         for i in range(start, min(start + count, len(self.memory))):
-            if self.memory[i] != 0:  # Показываем только ненулевые ячейки
+            if self.memory[i] != 0:
                 disasm = self.disassemble_instruction(self.memory[i])
                 result.append(f"{i:04X}: {self.memory[i]:04X} ({disasm})")
         return result

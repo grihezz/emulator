@@ -19,27 +19,18 @@ class Assembler:
             'JNZ': 0x8,       # 1000
             'HALT': 0x0       # 0000
         }
-        
-        # Словарь меток
+
         self.labels = {}
-        
-        # Словарь переменных
         self.variables = {}
-        
-        # Счетчик адресов
         self.address_counter = 0
     
     def reset(self):
-        """Сброс ассемблера"""
         self.labels = {}
         self.variables = {}
         self.address_counter = 0
     
     def parse_operand(self, operand_str):
-        """Парсинг операнда и определение типа адресации"""
         operand_str = operand_str.strip()
-        
-        # Непосредственная адресация (#value)
         if operand_str.startswith('#'):
             value = int(operand_str[1:])
             return value, 'immediate'
@@ -53,12 +44,10 @@ class Assembler:
                 return self.labels[addr_str], 'indirect'
             else:
                 raise ValueError(f"Неизвестная метка: {addr_str}")
-        
-        # Регистровая адресация (R0 - аккумулятор)
+
         if operand_str == 'R0':
             return 0, 'register'
-        
-        # Прямая адресация (address или метка)
+
         if operand_str.isdigit():
             return int(operand_str), 'direct'
         elif operand_str in self.labels:
@@ -66,12 +55,9 @@ class Assembler:
         elif operand_str in self.variables:
             return self.variables[operand_str], 'direct'
         else:
-            # Попытка интерпретировать как число
             try:
                 return int(operand_str), 'direct'
             except ValueError:
-                # Если это не число и не найденная метка, возможно метка еще не обработана
-                # В первом проходе это нормально, во втором - ошибка
                 raise ValueError(f"Неизвестный операнд: {operand_str}")
     
     def encode_instruction(self, opcode, operand, operand_type):

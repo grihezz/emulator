@@ -1,8 +1,3 @@
-"""
-Улучшенный графический интерфейс с визуализацией потока данных
-Показывает движение данных между компонентами процессора в реальном времени
-"""
-
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog, Canvas
 import time
@@ -17,6 +12,9 @@ class DataFlowVisualizer:
         self.height = height
         self.animations = []
         self.components = {}
+        # Настройки скорости анимации
+        self.animation_steps = 10  # Было 20, стало 10 (в 2 раза быстрее)
+        self.animation_delay = 25  # Было 50ms, стало 25ms (в 2 раза быстрее)
         self.create_components()
         
     def create_components(self):
@@ -123,7 +121,6 @@ class DataFlowVisualizer:
                 self.canvas.itemconfig(comp['text'], text=f'Флаги\n{value}')
                 
     def animate_data_flow(self, from_comp, to_comp, data_value, color='red'):
-        """Анимация движения данных между компонентами"""
         if from_comp not in self.components or to_comp not in self.components:
             return
             
@@ -131,15 +128,13 @@ class DataFlowVisualizer:
         from_y = self.components[from_comp]['y']
         to_x = self.components[to_comp]['x']
         to_y = self.components[to_comp]['y']
-        
-        # Создаем движущийся элемент
+
         data_circle = self.canvas.create_oval(from_x-10, from_y-10, from_x+10, from_y+10, 
                                             fill=color, outline='black', width=2)
         data_text = self.canvas.create_text(from_x, from_y, text=str(data_value), 
                                           font=('Arial', 8, 'bold'), fill='white')
-        
-        # Анимация движения
-        steps = 20
+
+        steps = self.animation_steps
         dx = (to_x - from_x) / steps
         dy = (to_y - from_y) / steps
         
@@ -147,22 +142,18 @@ class DataFlowVisualizer:
             if step < steps:
                 self.canvas.move(data_circle, dx, dy)
                 self.canvas.move(data_text, dx, dy)
-                self.canvas.after(50, lambda: animate_step(step + 1))
+                self.canvas.after(self.animation_delay, lambda: animate_step(step + 1))
             else:
-                # Удаляем анимированный элемент
                 self.canvas.delete(data_circle)
                 self.canvas.delete(data_text)
                 
         animate_step(0)
         
     def highlight_component(self, component, color='yellow', duration=500):
-        """Подсвечивание активного компонента"""
         if component in self.components:
             comp = self.components[component]
             original_color = self.canvas.itemcget(comp['rect'], 'fill')
             self.canvas.itemconfig(comp['rect'], fill=color)
-            
-            # Возвращаем исходный цвет через duration мс
             self.canvas.after(duration, lambda: self.canvas.itemconfig(comp['rect'], fill=original_color))
 
 class VisualProcessorGUI:
@@ -170,53 +161,38 @@ class VisualProcessorGUI:
         self.root = root
         self.root.title("Эмулятор процессора с визуализацией - Вариант №9")
         self.root.geometry("1400x900")
-        
-        # Инициализация компонентов
         self.processor = Processor()
         self.assembler = Assembler()
         self.running = False
         self.step_mode = False
-        
-        # Создание интерфейса
         self.create_widgets()
+        # Применяем настройки анимации
+        self.update_animation_settings()
         self.update_display()
         
     def create_widgets(self):
-        """Создание элементов интерфейса"""
-        # Главный контейнер
         main_container = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         main_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Левая панель - визуализация
         left_frame = ttk.Frame(main_container)
         main_container.add(left_frame, weight=2)
-        
-        # Правая панель - управление и код
         right_frame = ttk.Frame(main_container)
         main_container.add(right_frame, weight=1)
-        
-        # === ЛЕВАЯ ПАНЕЛЬ - ВИЗУАЛИЗАЦИЯ ===
-        
-        # Заголовок визуализации
+
         vis_title = ttk.Label(left_frame, text="Визуализация потока данных", font=('Arial', 14, 'bold'))
         vis_title.pack(pady=(0, 10))
-        
-        # Canvas для визуализации
+
         canvas_frame = ttk.Frame(left_frame)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
         
         self.canvas = Canvas(canvas_frame, bg='white', width=800, height=500)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        # Скроллбары для canvas
+
         v_scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
         v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas.configure(yscrollcommand=v_scrollbar.set)
-        
-        # Инициализация визуализатора
+
         self.visualizer = DataFlowVisualizer(self.canvas)
-        
-        # Панель управления визуализацией
+
         vis_control_frame = ttk.LabelFrame(left_frame, text="Управление визуализацией", padding=10)
         vis_control_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -227,54 +203,48 @@ class VisualProcessorGUI:
         ttk.Button(vis_buttons, text="Шаг", command=self.step_with_animation).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(vis_buttons, text="Запуск", command=self.run_with_animation).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(vis_buttons, text="Пауза", command=self.pause_execution).pack(side=tk.LEFT, padx=(0, 5))
-        
-        # Слайдер скорости
+
         speed_frame = ttk.Frame(vis_control_frame)
         speed_frame.pack(fill=tk.X, pady=(10, 0))
         
         ttk.Label(speed_frame, text="Скорость:").pack(side=tk.LEFT)
-        self.speed_var = tk.DoubleVar(value=1.0)
+        self.speed_var = tk.DoubleVar(value=2.0)  # По умолчанию 2x скорость
         speed_scale = ttk.Scale(speed_frame, from_=0.1, to=3.0, variable=self.speed_var, orient=tk.HORIZONTAL)
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
         ttk.Label(speed_frame, text="3x").pack(side=tk.RIGHT)
         
-        # === ПРАВАЯ ПАНЕЛЬ - УПРАВЛЕНИЕ ===
+        # Чекбокс для отключения анимации
+        self.animation_enabled_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(vis_control_frame, text="Включить анимацию", 
+                       variable=self.animation_enabled_var).pack(pady=(5, 0))
         
-        # Notebook для вкладок
+        # Привязываем изменение скорости к обновлению настроек
+        speed_scale.configure(command=self.update_animation_settings)
         notebook = ttk.Notebook(right_frame)
         notebook.pack(fill=tk.BOTH, expand=True)
-        
-        # Вкладка "Регистры"
+
         reg_frame = ttk.Frame(notebook)
         notebook.add(reg_frame, text="Регистры")
         
         self.create_register_panel(reg_frame)
-        
-        # Вкладка "Ассемблер"
+
         asm_frame = ttk.Frame(notebook)
         notebook.add(asm_frame, text="Ассемблер")
         
         self.create_assembler_panel(asm_frame)
-        
-        # Вкладка "Память"
+
         mem_frame = ttk.Frame(notebook)
         notebook.add(mem_frame, text="Память")
         
         self.create_memory_panel(mem_frame)
-        
-        # Вкладка "Логи"
         log_frame = ttk.Frame(notebook)
         notebook.add(log_frame, text="Логи")
         
         self.create_log_panel(log_frame)
         
     def create_register_panel(self, parent):
-        """Создание панели регистров"""
-        # Текущее состояние
         state_frame = ttk.LabelFrame(parent, text="Текущее состояние", padding=10)
         state_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Регистры
         self.acc_var = tk.StringVar()
         self.pc_var = tk.StringVar()
         self.ir_var = tk.StringVar()
@@ -287,8 +257,7 @@ class VisualProcessorGUI:
         
         ttk.Label(state_frame, text="Регистр команд:").grid(row=2, column=0, sticky=tk.W)
         ttk.Label(state_frame, textvariable=self.ir_var, font=('Courier', 10)).grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
-        
-        # Флаги
+
         flags_frame = ttk.LabelFrame(parent, text="Флаги", padding=10)
         flags_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -301,8 +270,7 @@ class VisualProcessorGUI:
             self.flag_vars[name] = var
             cb = ttk.Checkbutton(flags_frame, text=f"{name} ({desc})", variable=var, state="disabled")
             cb.pack(anchor=tk.W, pady=2)
-        
-        # Статистика
+
         stats_frame = ttk.LabelFrame(parent, text="Статистика", padding=10)
         stats_frame.pack(fill=tk.X)
         
@@ -316,51 +284,38 @@ class VisualProcessorGUI:
         ttk.Label(stats_frame, textvariable=self.step_count_var).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
     def create_assembler_panel(self, parent):
-        """Создание панели ассемблера"""
-        # Редактор кода
         ttk.Label(parent, text="Исходный код:").pack(anchor=tk.W)
         self.code_text = scrolledtext.ScrolledText(parent, height=15, width=50)
         self.code_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        
-        # Кнопки
+
         buttons_frame = ttk.Frame(parent)
         buttons_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Button(buttons_frame, text="Ассемблировать", command=self.assemble_code).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(buttons_frame, text="Загрузить", command=self.load_assembled_code).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(buttons_frame, text="Примеры", command=self.load_examples).pack(side=tk.LEFT)
-        
-        # Результат ассемблирования
+
         ttk.Label(parent, text="Машинный код:").pack(anchor=tk.W)
         self.asm_result_text = scrolledtext.ScrolledText(parent, height=8, width=50, state="disabled")
         self.asm_result_text.pack(fill=tk.BOTH, expand=True)
-        
-        # Загружаем пример по умолчанию
         self.load_default_example()
         
     def create_memory_panel(self, parent):
-        """Создание панели памяти"""
-        # Память команд
         ttk.Label(parent, text="Память команд:").pack(anchor=tk.W)
         self.memory_text = scrolledtext.ScrolledText(parent, height=10, width=50)
         self.memory_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        
-        # Память данных
+
         ttk.Label(parent, text="Память данных:").pack(anchor=tk.W)
         self.data_text = scrolledtext.ScrolledText(parent, height=10, width=50)
         self.data_text.pack(fill=tk.BOTH, expand=True)
         
     def create_log_panel(self, parent):
-        """Создание панели логов"""
         ttk.Label(parent, text="Лог выполнения:").pack(anchor=tk.W)
         self.log_text = scrolledtext.ScrolledText(parent, height=20, width=50)
         self.log_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        
-        # Кнопка очистки логов
         ttk.Button(parent, text="Очистить логи", command=self.clear_logs).pack()
         
     def load_default_example(self):
-        """Загрузка примера по умолчанию"""
         example_code = """; Вариант 9: Свертка двух массивов (6 элементов, целые без знака)
 ; Массив A начинается по адресу 300, массив B — по адресу 320.
 ; Формат хранения: [размер, элемент0, элемент1, ...]
@@ -433,83 +388,141 @@ END:
         self.code_text.insert(tk.END, example_code)
         
     def step_with_animation(self):
-        """Выполнение одного шага с анимацией"""
         if not self.processor.halted:
             old_state = self.get_processor_state()
             success = self.processor.step()
             new_state = self.get_processor_state()
             
             if success:
-                self.animate_instruction_execution(old_state, new_state)
+                if self.animation_enabled_var.get():
+                    self.animate_instruction_execution(old_state, new_state)
+                else:
+                    self.visualizer.update_component('ACC', new_state['ACC'])
+                    self.visualizer.update_component('PC', new_state['PC'])
+                    self.visualizer.update_component('IR', new_state['IR'])
+                    flags_str = f"{'Z' if new_state['flags']['ZF'] else '-'}{'S' if new_state['flags']['SF'] else '-'}{'C' if new_state['flags']['CF'] else '-'}{'O' if new_state['flags']['OF'] else '-'}"
+                    self.visualizer.update_component('FLAGS', flags_str)
                 self.log_instruction(old_state, new_state)
                 
             self.update_display()
             
+            if self.processor.halted:
+                result = self.processor.memory[100]
+                messagebox.showinfo("Программа завершена", 
+                    f"Результат сохранен в ячейке 100: {result}")
+            
     def run_with_animation(self):
-        """Запуск с анимацией"""
         if not self.running and not self.processor.halted:
             self.running = True
             self.animate_continuous_execution()
             
     def animate_continuous_execution(self):
-        """Непрерывное выполнение с анимацией"""
         if self.running and not self.processor.halted:
-            self.step_with_animation()
-            # Задержка зависит от скорости
-            delay = int(1000 / self.speed_var.get())
+            # Защита от бесконечного выполнения
+            if self.processor.step_count > 10000:
+                self.running = False
+                messagebox.showwarning("Превышен лимит", 
+                    f"Программа выполнила {self.processor.step_count} шагов и остановлена.\n"
+                    f"Результат в ячейке 100: {self.processor.memory[100]}")
+                return
+            
+            old_state = self.get_processor_state()
+            self.processor.step()
+            new_state = self.get_processor_state()
+            
+            if self.animation_enabled_var.get():
+                self.animate_instruction_execution(old_state, new_state)
+            else:
+                self.visualizer.update_component('ACC', new_state['ACC'])
+                self.visualizer.update_component('PC', new_state['PC'])
+                self.visualizer.update_component('IR', new_state['IR'])
+                flags_str = f"{'Z' if new_state['flags']['ZF'] else '-'}{'S' if new_state['flags']['SF'] else '-'}{'C' if new_state['flags']['CF'] else '-'}{'O' if new_state['flags']['OF'] else '-'}"
+                self.visualizer.update_component('FLAGS', flags_str)
+            
+            self.log_instruction(old_state, new_state)
+            self.update_display()
+            
+            # Быстрое выполнение без анимации для производительности
+            delay = 0  # Минимальная задержка
             self.root.after(delay, self.animate_continuous_execution)
         else:
             self.running = False
+            if self.processor.halted:
+                result = self.processor.memory[100]
+                messagebox.showinfo("Программа завершена", 
+                    f"Результат сохранен в ячейке 100: {result}")
             
     def pause_execution(self):
-        """Пауза выполнения"""
         self.running = False
+    
+    def update_animation_settings(self, *args):
+        """Обновление настроек анимации на основе слайдера скорости"""
+        speed = self.speed_var.get()
+        
+        # Применяем скорость: чем выше значение, тем быстрее анимация
+        # speed=1.0 → нормальная скорость
+        # speed=3.0 → 3x быстрее
+        if self.animation_enabled_var.get():
+            # Меньше шагов и меньше задержка = быстрее
+            # base_steps = 10, но делаем динамически
+            self.visualizer.animation_steps = max(3, int(15 / speed))
+            self.visualizer.animation_delay = max(5, int(50 / speed))
+        else:
+            # Анимация отключена
+            self.visualizer.animation_steps = 1
+            self.visualizer.animation_delay = 1
         
     def animate_instruction_execution(self, old_state, new_state):
-        """Анимация выполнения инструкции"""
-        # Определяем тип операции по изменениям состояния
         ir = new_state['IR']
         opcode = (ir >> 12) & 0xF
         operand = ir & 0xFFF
         
-        # Подсвечиваем активные компоненты
-        self.visualizer.highlight_component('PC', 'lightblue', 300)
-        self.visualizer.highlight_component('IR', 'lightgreen', 500)
+        # Применяем текущую скорость ко всем задержкам
+        speed = self.speed_var.get()
+        delay_1 = max(10, int(100 / speed))  # Было 100
+        delay_2 = max(20, int(200 / speed))  # Было 200
+        delay_3 = max(40, int(400 / speed))  # Было 400
+        delay_4 = max(60, int(600 / speed))  # Было 600
+        delay_5 = max(80, int(800 / speed))  # Было 800
+        delay_short = max(5, int(50 / speed))  # Было 50
+
+        self.visualizer.highlight_component('PC', 'lightblue', delay_5)
+        self.visualizer.highlight_component('IR', 'lightgreen', delay_4)
         
-        if opcode == 0x1:  # LOAD
-            if operand >= 512:  # Непосредственная адресация
+        if opcode == 0x1:
+            if operand >= 512:
                 value = operand - 512
                 self.visualizer.animate_data_flow('CU', 'ACC', value, 'blue')
-            else:  # Прямая адресация
+            else:
                 self.visualizer.animate_data_flow('MEM', 'DATA_BUS', f'M[{operand}]', 'green')
-                self.root.after(100, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'ACC', new_state['ACC'], 'green'))
+                self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'ACC', new_state['ACC'], 'green'))
                 
-        elif opcode == 0x2:  # STORE
+        elif opcode == 0x2:
             self.visualizer.animate_data_flow('ACC', 'DATA_BUS', old_state['ACC'], 'red')
-            self.root.after(100, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'MEM', f'→M[{operand}]', 'red'))
+            self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'MEM', f'→M[{operand}]', 'red'))
             
         elif opcode == 0x3 or opcode == 0x4:  # ADD/SUB
-            self.visualizer.highlight_component('ALU', 'yellow', 800)
+            self.visualizer.highlight_component('ALU', 'yellow', delay_5)
             self.visualizer.animate_data_flow('ACC', 'ALU', old_state['ACC'], 'purple')
             if operand >= 512:
                 value = operand - 512
-                self.root.after(200, lambda: self.visualizer.animate_data_flow('CU', 'ALU', value, 'purple'))
+                self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('CU', 'ALU', value, 'purple'))
             else:
-                self.root.after(200, lambda: self.visualizer.animate_data_flow('MEM', 'ALU', f'M[{operand}]', 'purple'))
-            self.root.after(400, lambda: self.visualizer.animate_data_flow('ALU', 'ACC', new_state['ACC'], 'purple'))
-            self.root.after(600, lambda: self.visualizer.animate_data_flow('ALU', 'FLAGS', 'flags', 'orange'))
+                self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('MEM', 'ALU', f'M[{operand}]', 'purple'))
+            self.root.after(delay_3, lambda: self.visualizer.animate_data_flow('ALU', 'ACC', new_state['ACC'], 'purple'))
+            self.root.after(delay_4, lambda: self.visualizer.animate_data_flow('ALU', 'FLAGS', 'flags', 'orange'))
             
         elif opcode == 0x5:  # CMP
-            self.visualizer.highlight_component('ALU', 'yellow', 800)
+            self.visualizer.highlight_component('ALU', 'yellow', delay_5)
             self.visualizer.animate_data_flow('ACC', 'ALU', old_state['ACC'], 'cyan')
-            self.root.after(200, lambda: self.visualizer.animate_data_flow('ALU', 'FLAGS', 'cmp', 'orange'))
+            self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('ALU', 'FLAGS', 'cmp', 'orange'))
             
         # Обновляем визуальные компоненты
-        self.root.after(50, lambda: self.visualizer.update_component('ACC', new_state['ACC']))
-        self.root.after(100, lambda: self.visualizer.update_component('PC', new_state['PC']))
-        self.root.after(150, lambda: self.visualizer.update_component('IR', new_state['IR']))
+        self.root.after(delay_short, lambda: self.visualizer.update_component('ACC', new_state['ACC']))
+        self.root.after(delay_1, lambda: self.visualizer.update_component('PC', new_state['PC']))
+        self.root.after(delay_2, lambda: self.visualizer.update_component('IR', new_state['IR']))
         flags_str = f"{'Z' if new_state['flags']['ZF'] else '-'}{'S' if new_state['flags']['SF'] else '-'}{'C' if new_state['flags']['CF'] else '-'}{'O' if new_state['flags']['OF'] else '-'}"
-        self.root.after(200, lambda: self.visualizer.update_component('FLAGS', flags_str))
+        self.root.after(delay_3, lambda: self.visualizer.update_component('FLAGS', flags_str))
         
     def get_processor_state(self):
         """Получение состояния процессора"""
