@@ -36,6 +36,12 @@ class Assembler:
             return value, 'immediate'
         
         # Косвенно-регистровая адресация ((address))
+        if operand_str.upper().startswith('(R') and operand_str.endswith(')') and operand_str[2:-1].isdigit():
+            reg_num = int(operand_str[2:-1])
+            if 0 <= reg_num <= 15:
+                return reg_num, 'reg_indirect'
+            else:
+                raise ValueError(f"Invalid register in (Rk): {operand_str}")
         if operand_str.startswith('(') and operand_str.endswith(')'):
             addr_str = operand_str[1:-1].strip()
             if addr_str.isdigit():
@@ -76,6 +82,8 @@ class Assembler:
         elif operand_type == 'indirect':
             # Косвенная адресация: добавляем 256
             encoded_operand = (operand + 256) & 0xFFF
+        elif operand_type == 'reg_indirect':
+            encoded_operand = (operand + 1040) & 0xFFF
         elif operand_type == 'register':
             # Регистровая адресация: добавляем 1024
             encoded_operand = (operand + 1024) & 0xFFF
@@ -197,6 +205,8 @@ class Assembler:
                 operand_str = f"#{operand}"
             elif operand_type == 'indirect':
                 operand_str = f"({operand})"
+            elif operand_type == 'reg_indirect':
+                operand_str = f"(R{operand})"
             elif operand_type == 'register':
                 operand_str = f"R{operand}"
             elif operand_type == 'direct':
