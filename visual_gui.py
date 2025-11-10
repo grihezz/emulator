@@ -529,10 +529,50 @@ END:
         self.visualizer.highlight_component('PC', 'lightblue', delay_5)
         self.visualizer.highlight_component('IR', 'lightgreen', delay_4)
         
+        # Handle STORE early to ensure proper register animations
+        if opcode == 0x2:
+            if 1040 <= operand < 1056:  # (Rk)
+                reg_num = operand - 1040
+                self.visualizer.highlight_component(f'R{reg_num}', 'lightyellow', delay_short)
+                self.visualizer.animate_data_flow('ACC', 'DATA_BUS', old_state['ACC'], 'red')
+                self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'MEM', f'M[R{reg_num}]', 'red'))
+            elif 1024 <= operand < 1040:  # Rk
+                reg_num = operand - 1024
+                self.visualizer.highlight_component(f'R{reg_num}', 'lightyellow', delay_short)
+                self.visualizer.animate_data_flow('ACC', f'R{reg_num}', old_state['ACC'], 'red')
+            elif 256 <= operand < 512:  # (addr)
+                addr = operand - 256
+                self.visualizer.animate_data_flow('ACC', 'DATA_BUS', old_state['ACC'], 'red')
+                self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'MEM', f'M[M[{addr}]]', 'red'))
+            else:  # direct addr
+                self.visualizer.animate_data_flow('ACC', 'DATA_BUS', old_state['ACC'], 'red')
+                self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'MEM', f'M[{operand}]', 'red'))
+
+            # Update components and exit
+            self.root.after(delay_short, lambda: self.visualizer.update_component('ACC', new_state['ACC']))
+            self.root.after(delay_1, lambda: self.visualizer.update_component('PC', new_state['PC']))
+            self.root.after(delay_2, lambda: self.visualizer.update_component('IR', new_state['IR']))
+            flags_str = f"{'Z' if new_state['flags']['ZF'] else '-'}{'S' if new_state['flags']['SF'] else '-'}{'C' if new_state['flags']['CF'] else '-'}{'O' if new_state['flags']['OF'] else '-'}"
+            self.root.after(delay_3, lambda: self.visualizer.update_component('FLAGS', flags_str))
+            return
+
         if opcode == 0x1:
-            if operand >= 512:
+            if operand >= 1040 and operand < 1056:
+                reg_num = operand - 1040
+                self.visualizer.highlight_component(f'R{reg_num}', 'lightyellow', delay_short)
+                self.visualizer.animate_data_flow('MEM', 'DATA_BUS', f'M[R{reg_num}]', 'green')
+                self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'ACC', new_state['ACC'], 'green'))
+            elif operand >= 1024 and operand < 1040:
+                reg_num = operand - 1024
+                self.visualizer.highlight_component(f'R{reg_num}', 'lightyellow', delay_short)
+                self.visualizer.animate_data_flow(f'R{reg_num}', 'ACC', self.processor.registers[reg_num], 'blue')
+            elif operand >= 512:
                 value = operand - 512
                 self.visualizer.animate_data_flow('CU', 'ACC', value, 'blue')
+            elif operand >= 256:
+                addr = operand - 256
+                self.visualizer.animate_data_flow('MEM', 'DATA_BUS', f'M[{addr}]', 'green')
+                self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'ACC', new_state['ACC'], 'green'))
             else:
                 self.visualizer.animate_data_flow('MEM', 'DATA_BUS', f'M[{operand}]', 'green')
                 self.root.after(delay_1, lambda: self.visualizer.animate_data_flow('DATA_BUS', 'ACC', new_state['ACC'], 'green'))
@@ -544,9 +584,20 @@ END:
         elif opcode == 0x3 or opcode == 0x4:  # ADD/SUB
             self.visualizer.highlight_component('ALU', 'yellow', delay_5)
             self.visualizer.animate_data_flow('ACC', 'ALU', old_state['ACC'], 'purple')
-            if operand >= 512:
+            if operand >= 1040 and operand < 1056:
+                reg_num = operand - 1040
+                self.visualizer.highlight_component(f'R{reg_num}', 'lightyellow', delay_short)
+                self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('MEM', 'ALU', f'M[R{reg_num}]', 'purple'))
+            elif operand >= 1024 and operand < 1040:
+                reg_num = operand - 1024
+                self.visualizer.highlight_component(f'R{reg_num}', 'lightyellow', delay_short)
+                self.root.after(delay_2, lambda: self.visualizer.animate_data_flow(f'R{reg_num}', 'ALU', self.processor.registers[reg_num], 'purple'))
+            elif operand >= 512:
                 value = operand - 512
                 self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('CU', 'ALU', value, 'purple'))
+            elif operand >= 256:
+                addr = operand - 256
+                self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('MEM', 'ALU', f'M[{addr}]', 'purple'))
             else:
                 self.root.after(delay_2, lambda: self.visualizer.animate_data_flow('MEM', 'ALU', f'M[{operand}]', 'purple'))
             self.root.after(delay_3, lambda: self.visualizer.animate_data_flow('ALU', 'ACC', new_state['ACC'], 'purple'))

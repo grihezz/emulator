@@ -121,6 +121,22 @@ class Processor:
             elif operand >= 1024 and operand < 1040:  # 1024-1039: регистровая адресация (R0-R15)
                 reg_num = operand - 1024
                 value = self.registers[reg_num] & 0xFFFF
+            elif operand >= 1040 and operand < 1056:
+                reg_num = operand - 1040
+                addr = self.registers[reg_num] & 0xFFFF
+                value = self.memory[addr] if addr < len(self.memory) else 0
+            elif operand >= 1040 and operand < 1056:
+                reg_num = operand - 1040
+                addr = self.registers[reg_num] & 0xFFFF
+                value = self.memory[addr] if addr < len(self.memory) else 0
+            elif operand >= 1040 and operand < 1056:
+                reg_num = operand - 1040
+                addr = self.registers[reg_num] & 0xFFFF
+                value = self.memory[addr] if addr < len(self.memory) else 0
+            elif operand >= 1040 and operand < 1056:
+                reg_num = operand - 1040
+                addr = self.registers[reg_num] & 0xFFFF
+                value = self.memory[addr] if addr < len(self.memory) else 0
             else:
                 value = 0
             self.ACC = value & 0xFFFF
@@ -130,6 +146,19 @@ class Processor:
             if operand >= 1024 and operand < 1040:
                 reg_num = operand - 1024
                 self.registers[reg_num] = self.ACC & 0xFFFF
+            elif operand >= 1040 and operand < 1056:
+                # store via register-indirect (Rk)
+                reg_num = operand - 1040
+                addr = self.registers[reg_num] & 0xFFFF
+                if addr < len(self.memory):
+                    self.memory[addr] = self.ACC & 0xFFFF
+            elif operand >= 256 and operand < 512:
+                # store via memory-indirect ((addr))
+                base = operand - 256
+                if base < len(self.memory):
+                    addr = self.memory[base]
+                    if addr < len(self.memory):
+                        self.memory[addr] = self.ACC & 0xFFFF
             else:
                 self.memory[operand] = self.ACC & 0xFFFF
             
@@ -254,6 +283,9 @@ class Processor:
                 if operand >= 1024 and operand < 1040:
                     reg_num = operand - 1024
                     return f"{op_name} R{reg_num}"
+                elif operand >= 1040 and operand < 1056:
+                    reg_num = operand - 1040
+                    return f"{op_name} (R{reg_num})"
                 elif operand >= 512 and operand < 1024:
                     value = operand - 512
                     return f"{op_name} #{value}"
